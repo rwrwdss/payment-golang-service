@@ -9,11 +9,12 @@ import (
 
 // Payment — один платёж клиента. Суммы хранятся в минимальных единицах (копейки, центы).
 type Payment struct {
-	ID        uuid.UUID
-	Amount    int64
-	Currency  Currency
-	Status    Status
-	CreatedAt time.Time
+	id        uuid.UUID
+	amount    int64
+	currency  Currency
+	status    Status
+	createdAt time.Time
+	updatedAt time.Time
 	method    Method // Приватное: задается только в конструкторе
 }
 
@@ -32,14 +33,22 @@ func NewPayment(amount int64, currency Currency, method Method) (*Payment, error
 	}
 
 	return &Payment{
-		ID:        uuid.New(),
-		Amount:    amount,
-		Currency:  currency,
-		Status:    StatusNew,
-		CreatedAt: time.Now(),
+		id:        uuid.New(),
+		amount:    amount,
+		currency:  currency,
+		status:    StatusNew,
+		createdAt: time.Now(),
 		method:    method,
 	}, nil
 }
 
 // Method возвращает способ оплаты платежа.
 func (p *Payment) Method() Method { return p.method }
+
+// Геттеры
+func (p *Payment) ID() uuid.UUID        { return p.id }
+func (p *Payment) Amount() int64        { return p.amount }
+func (p *Payment) Currency() Currency   { return p.currency }
+func (p *Payment) Status() Status       { return p.status }
+func (p *Payment) CreatedAt() time.Time { return p.createdAt }
+func (p *Payment) UpdatedAt() time.Time { return p.updatedAt }

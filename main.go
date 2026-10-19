@@ -12,6 +12,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Printf("payment %s: %d %s, status %s\n", p.ID, p.Amount, p.Currency, p.Status)
+	fmt.Printf("payment %s: %d %s, status %s\n", p.ID(), p.Amount(), p.Currency(), p.Status())
 }
