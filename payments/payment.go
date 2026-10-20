@@ -7,15 +7,16 @@ import (
 	"github.com/google/uuid"
 )
 
-// Payment — один платёж клиента. Суммы хранятся в минимальных единицах (копейки, центы).
+// Payment — один платёж клиента.
+// Поля приватные: читаются через геттеры, статус меняется только через методы переходов.
 type Payment struct {
-	id        uuid.UUID
-	amount    int64
-	currency  Currency
-	status    Status
-	createdAt time.Time
-	updatedAt time.Time
-	method    Method // Приватное: задается только в конструкторе
+	id        uuid.UUID // уникальный идентификатор, выдаётся при создании
+	amount    int64     // сумма в минимальных единицах валюты (копейки, центы)
+	currency  Currency  // валюта платежа
+	method    Method    // способ оплаты, задаётся только в конструкторе
+	status    Status    // текущий этап платежа
+	createdAt time.Time // когда платёж создан
+	updatedAt time.Time // когда статус менялся последний раз
 }
 
 // NewPayment проверяет входные данные и создаёт платёж в статусе StatusNew.
@@ -32,23 +33,36 @@ func NewPayment(amount int64, currency Currency, method Method) (*Payment, error
 		return nil, ErrInvalidMethod
 	}
 
+	now := time.Now()
+
 	return &Payment{
 		id:        uuid.New(),
 		amount:    amount,
 		currency:  currency,
-		status:    StatusNew,
-		createdAt: time.Now(),
 		method:    method,
+		status:    StatusNew,
+		createdAt: now,
+		updatedAt: now,
 	}, nil
 }
+
+// ID возвращает уникальный идентификатор платежа.
+func (p *Payment) ID() uuid.UUID { return p.id }
+
+// Amount возвращает сумму в минимальных единицах валюты.
+func (p *Payment) Amount() int64 { return p.amount }
+
+// Currency возвращает валюту платежа.
+func (p *Payment) Currency() Currency { return p.currency }
 
 // Method возвращает способ оплаты платежа.
 func (p *Payment) Method() Method { return p.method }
 
-// Геттеры
-func (p *Payment) ID() uuid.UUID        { return p.id }
-func (p *Payment) Amount() int64        { return p.amount }
-func (p *Payment) Currency() Currency   { return p.currency }
-func (p *Payment) Status() Status       { return p.status }
+// Status возвращает текущий статус платежа.
+func (p *Payment) Status() Status { return p.status }
+
+// CreatedAt возвращает время создания платежа.
 func (p *Payment) CreatedAt() time.Time { return p.createdAt }
+
+// UpdatedAt возвращает время последней смены статуса.
 func (p *Payment) UpdatedAt() time.Time { return p.updatedAt }
