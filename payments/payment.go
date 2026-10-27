@@ -2,6 +2,7 @@
 package payments
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -66,3 +67,22 @@ func (p *Payment) CreatedAt() time.Time { return p.createdAt }
 
 // UpdatedAt возвращает время последней смены статуса.
 func (p *Payment) UpdatedAt() time.Time { return p.updatedAt }
+
+// StartProcessing отмечает, что платёж отправлен в банк.
+func (p *Payment) StartProcessing() error { return p.transitionTo(StatusWaiting) }
+
+// Succeed отмечает, что банк подтвердил списание.
+func (p *Payment) Succeed() error { return p.transitionTo(StatusSuccess) }
+
+// Deny отмечает, что банк отклонил платёж.
+func (p *Payment) Deny() error { return p.transitionTo(StatusDenied) }
+
+func (p *Payment) transitionTo(next Status) error {
+	if !p.status.CanTransitionTo(next) {
+		return fmt.Errorf("%w: %s -> %s", ErrInvalidTransition, p.status, next)
+	}
+
+	p.status = next
+	p.updatedAt = time.Now()
+	return nil
+}
