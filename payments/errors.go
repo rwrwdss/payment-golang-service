@@ -8,4 +8,5 @@ var (
 	ErrInvalidCurrency   = errors.New("payments: currency is not supported")
 	ErrInvalidMethod     = errors.New("payments: payment method is not supported")
 	ErrInvalidTransition = errors.New("payments: invalid status transition")
+	ErrNotFound          = errors.New("payments: payment not found")
 )
