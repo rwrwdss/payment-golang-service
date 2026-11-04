@@ -8,9 +8,9 @@ func TestStatusIsFinal(t *testing.T) {
 		want   bool
 	}{
 		{StatusNew, false},
-		{StatusWaiting, false},
-		{StatusSuccess, true},
-		{StatusDenied, true},
+		{StatusPending, false},
+		{StatusSucceeded, true},
+		{StatusCanceled, true},
 	}
 
 	for _, tt := range tests {
@@ -28,14 +28,14 @@ func TestStatusCanTransitionTo(t *testing.T) {
 		to   Status
 		want bool
 	}{
-		{StatusNew, StatusWaiting, true},
-		{StatusWaiting, StatusSuccess, true},
-		{StatusWaiting, StatusDenied, true},
-		{StatusNew, StatusSuccess, false},
-		{StatusNew, StatusDenied, false},
-		{StatusWaiting, StatusNew, false},
-		{StatusSuccess, StatusDenied, false},
-		{StatusDenied, StatusSuccess, false},
+		{StatusNew, StatusPending, true},
+		{StatusNew, StatusCanceled, true},
+		{StatusPending, StatusSucceeded, true},
+		{StatusPending, StatusCanceled, true},
+		{StatusNew, StatusSucceeded, false},
+		{StatusPending, StatusNew, false},
+		{StatusSucceeded, StatusCanceled, false},
+		{StatusCanceled, StatusSucceeded, false},
 	}
 
 	for _, tt := range tests {

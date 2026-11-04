@@ -44,8 +44,8 @@ func TestPaymentRepositorySaveOverwrites(t *testing.T) {
 	p := newPayment(t)
 	mustSave(t, repo, p)
 
-	if err := p.StartProcessing(); err != nil {
-		t.Fatalf("StartProcessing: %v", err)
+	if err := p.Submit("2d7a1c3e-000f-5000-9000-1b2c3d4e5f60", "https://yoomoney.ru/checkout"); err != nil {
+		t.Fatalf("Submit: %v", err)
 	}
 	mustSave(t, repo, p)
 	mustSave(t, repo, p)
@@ -54,8 +54,8 @@ func TestPaymentRepositorySaveOverwrites(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
-	if got.Status() != payments.StatusWaiting {
-		t.Errorf("Status() = %q, want %q", got.Status(), payments.StatusWaiting)
+	if got.Status() != payments.StatusPending {
+		t.Errorf("Status() = %q, want %q", got.Status(), payments.StatusPending)
 	}
 }
 
@@ -64,15 +64,15 @@ func TestPaymentRepositoryKeepsChangesUntilSave(t *testing.T) {
 	p := newPayment(t)
 	mustSave(t, repo, p)
 
-	if err := p.StartProcessing(); err != nil {
-		t.Fatalf("StartProcessing: %v", err)
+	if err := p.Submit("2d7a1c3e-000f-5000-9000-1b2c3d4e5f60", "https://yoomoney.ru/checkout"); err != nil {
+		t.Fatalf("Submit: %v", err)
 	}
 	loaded, err := repo.GetByID(context.Background(), p.ID())
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
 	}
-	if err := loaded.StartProcessing(); err != nil {
-		t.Fatalf("StartProcessing on loaded: %v", err)
+	if err := loaded.Cancel("canceled_by_merchant"); err != nil {
+		t.Fatalf("Cancel on loaded: %v", err)
 	}
 	got, err := repo.GetByID(context.Background(), p.ID())
 
@@ -109,7 +109,7 @@ func TestPaymentRepositoryConcurrentAccess(t *testing.T) {
 func newPayment(t *testing.T) *payments.Payment {
 	t.Helper()
 
-	p, err := payments.NewPayment(15000, payments.CurrencyRUB, payments.MethodCard)
+	p, err := payments.NewPayment(15000, payments.CurrencyRUB, payments.MethodCard, "Заказ №1")
 	if err != nil {
 		t.Fatalf("NewPayment: %v", err)
 	}

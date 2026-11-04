@@ -4,16 +4,14 @@ package payments
 type Method string
 
 const (
-	MethodApplePay  Method = "applepay"
-	MethodGooglePay Method = "googlepay"
-	MethodCard      Method = "card"
-	MethodSBP       Method = "sbp"
+	MethodCard Method = "card" // банковская карта
+	MethodSBP  Method = "sbp"  // Система быстрых платежей
 )
 
 // IsValid сообщает, поддерживается ли этот способ оплаты.
 func (m Method) IsValid() bool {
 	switch m {
-	case MethodApplePay, MethodGooglePay, MethodCard, MethodSBP:
+	case MethodCard, MethodSBP:
 		return true
 	}
 	return false

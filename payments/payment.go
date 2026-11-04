@@ -1,27 +1,36 @@
-// Package payments описывает платёж и правила его создания.
+// Package payments описывает платёж, правила смены его статусов
+// и сценарии работы с платёжным провайдером.
 package payments
 
 import (
 	"fmt"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
 
+// maxDescriptionLen — ограничение ЮKassa на длину описания платежа (в символах).
+const maxDescriptionLen = 128
+
 // Payment — один платёж клиента.
 // Поля приватные: читаются через геттеры, статус меняется только через методы переходов.
 type Payment struct {
-	id        uuid.UUID // уникальный идентификатор, выдаётся при создании
-	amount    int64     // сумма в минимальных единицах валюты (копейки, центы)
-	currency  Currency  // валюта платежа
-	method    Method    // способ оплаты, задаётся только в конструкторе
-	status    Status    // текущий этап платежа
-	createdAt time.Time // когда платёж создан
-	updatedAt time.Time // когда статус менялся последний раз
+	id              uuid.UUID // наш идентификатор, он же ключ идемпотентности для провайдера
+	amount          int64     // сумма в минимальных единицах валюты (копейки, центы)
+	currency        Currency  // валюта платежа
+	method          Method    // способ оплаты, задаётся только в конструкторе
+	description     string    // описание, которое клиент увидит на странице оплаты
+	status          Status    // текущий этап платежа
+	providerID      string    // идентификатор платежа в ЮKassa, появляется после Submit
+	confirmationURL string    // страница оплаты, куда нужно отправить клиента
+	cancelReason    string    // причина отмены от провайдера, например insufficient_funds
+	createdAt       time.Time // когда платёж создан
+	updatedAt       time.Time // когда статус менялся последний раз
 }
 
 // NewPayment проверяет входные данные и создаёт платёж в статусе StatusNew.
-func NewPayment(amount int64, currency Currency, method Method) (*Payment, error) {
+func NewPayment(amount int64, currency Currency, method Method, description string) (*Payment, error) {
 	if amount <= 0 {
 		return nil, ErrInvalidAmount
 	}
@@ -34,16 +43,21 @@ func NewPayment(amount int64, currency Currency, method Method) (*Payment, error
 		return nil, ErrInvalidMethod
 	}
 
+	if utf8.RuneCountInString(description) > maxDescriptionLen {
+		return nil, ErrInvalidDescription
+	}
+
 	now := time.Now()
 
 	return &Payment{
-		id:        uuid.New(),
-		amount:    amount,
-		currency:  currency,
-		method:    method,
-		status:    StatusNew,
-		createdAt: now,
-		updatedAt: now,
+		id:          uuid.New(),
+		amount:      amount,
+		currency:    currency,
+		method:      method,
+		description: description,
+		status:      StatusNew,
+		createdAt:   now,
+		updatedAt:   now,
 	}, nil
 }
 
@@ -59,8 +73,20 @@ func (p *Payment) Currency() Currency { return p.currency }
 // Method возвращает способ оплаты платежа.
 func (p *Payment) Method() Method { return p.method }
 
+// Description возвращает описание платежа.
+func (p *Payment) Description() string { return p.description }
+
 // Status возвращает текущий статус платежа.
 func (p *Payment) Status() Status { return p.status }
+
+// ProviderID возвращает идентификатор платежа в ЮKassa или пустую строку, если платёж ещё не отправлен.
+func (p *Payment) ProviderID() string { return p.providerID }
+
+// ConfirmationURL возвращает ссылку на страницу оплаты.
+func (p *Payment) ConfirmationURL() string { return p.confirmationURL }
+
+// CancelReason возвращает причину отмены, если платёж отменён.
+func (p *Payment) CancelReason() string { return p.cancelReason }
 
 // CreatedAt возвращает время создания платежа.
 func (p *Payment) CreatedAt() time.Time { return p.createdAt }
@@ -68,15 +94,35 @@ func (p *Payment) CreatedAt() time.Time { return p.createdAt }
 // UpdatedAt возвращает время последней смены статуса.
 func (p *Payment) UpdatedAt() time.Time { return p.updatedAt }
 
-// StartProcessing отмечает, что платёж отправлен в банк.
-func (p *Payment) StartProcessing() error { return p.transitionTo(StatusWaiting) }
+// Submit отмечает, что платёж создан у провайдера и ждёт оплаты клиентом.
+func (p *Payment) Submit(providerID, confirmationURL string) error {
+	if providerID == "" {
+		return ErrMissingProviderID
+	}
+	if err := p.transitionTo(StatusPending); err != nil {
+		return err
+	}
 
-// Succeed отмечает, что банк подтвердил списание.
-func (p *Payment) Succeed() error { return p.transitionTo(StatusSuccess) }
+	p.providerID = providerID
+	p.confirmationURL = confirmationURL
+	return nil
+}
 
-// Deny отмечает, что банк отклонил платёж.
-func (p *Payment) Deny() error { return p.transitionTo(StatusDenied) }
+// Succeed отмечает, что провайдер подтвердил списание.
+func (p *Payment) Succeed() error { return p.transitionTo(StatusSucceeded) }
 
+// Cancel отмечает, что платёж отменён, и запоминает причину.
+func (p *Payment) Cancel(reason string) error {
+	if err := p.transitionTo(StatusCanceled); err != nil {
+		return err
+	}
+
+	p.cancelReason = reason
+	return nil
+}
+
+// transitionTo — единственное место, где меняется статус.
+// При запрещённом переходе платёж остаётся без изменений.
 func (p *Payment) transitionTo(next Status) error {
 	if !p.status.CanTransitionTo(next) {
 		return fmt.Errorf("%w: %s -> %s", ErrInvalidTransition, p.status, next)

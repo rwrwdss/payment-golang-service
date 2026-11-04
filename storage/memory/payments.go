@@ -11,6 +11,8 @@ import (
 	"payment-service/payments"
 )
 
+var _ payments.Repository = (*PaymentRepository)(nil)
+
 // PaymentRepository хранит платежи в map и безопасен для параллельного доступа.
 // Внутри лежат копии: изменения платежа попадают в хранилище только через Save.
 type PaymentRepository struct {

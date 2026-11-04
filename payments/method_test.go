@@ -7,10 +7,9 @@ func TestMethodIsValid(t *testing.T) {
 		method Method
 		want   bool
 	}{
-		{MethodApplePay, true},
-		{MethodGooglePay, true},
 		{MethodCard, true},
 		{MethodSBP, true},
+		{"applepay", false},
 		{"cash", false},
 		{"CARD", false},
 		{"", false},
