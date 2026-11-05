@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"log"
 	"net/http"
@@ -10,9 +11,11 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/lib/pq"
+
 	"payment-service/httpapi"
 	"payment-service/payments"
-	"payment-service/storage/memory"
+	"payment-service/storage/postgres"
 	"payment-service/yookassa"
 )
 
@@ -30,7 +33,27 @@ func main() {
 		log.Fatal("config: set YOOKASSA_RETURN_URL")
 	}
 
-	svc := payments.NewService(memory.NewPaymentRepository(), yookassa.NewGateway(client, returnURL))
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Fatal("config: set DATABASE_URL")
+	}
+
+	db, err := sql.Open("postgres", databaseURL)
+	if err != nil {
+		log.Fatalf("open database: %v", err)
+	}
+	defer db.Close()
+
+	startupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := db.PingContext(startupCtx); err != nil {
+		log.Fatalf("connect to database: %v", err)
+	}
+	if err := postgres.EnsureSchema(startupCtx, db); err != nil {
+		log.Fatalf("prepare database: %v", err)
+	}
+
+	svc := payments.NewService(postgres.NewPaymentRepository(db), yookassa.NewGateway(client, returnURL))
 	addr := os.Getenv("LISTEN_ADDR")
 	if addr == "" {
 		addr = ":8080"

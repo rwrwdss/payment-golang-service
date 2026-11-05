@@ -95,6 +95,41 @@ func TestServiceCreateInvalidInput(t *testing.T) {
 	}
 }
 
+func TestServiceCreateWithIdempotencyKey(t *testing.T) {
+	svc, repo, gateway := newService()
+
+	first, err := svc.CreateWithIdempotencyKey(context.Background(), "shop-order-1", 15000, payments.CurrencyRUB, payments.MethodCard, "Order 1")
+	if err != nil {
+		t.Fatalf("first CreateWithIdempotencyKey: %v", err)
+	}
+	reused, err := svc.CreateWithIdempotencyKey(context.Background(), "shop-order-1", 15000, payments.CurrencyRUB, payments.MethodCard, "Order 1")
+	if err != nil {
+		t.Fatalf("duplicate CreateWithIdempotencyKey: %v", err)
+	}
+	if reused.ID() != first.ID() {
+		t.Fatalf("duplicate payment id = %s, want %s", reused.ID(), first.ID())
+	}
+	if len(gateway.createdFor) != 1 {
+		t.Fatalf("provider create called %d times, want 1", len(gateway.createdFor))
+	}
+	assertStored(t, repo, first.ID(), payments.StatusPending)
+
+	_, err = svc.CreateWithIdempotencyKey(context.Background(), "shop-order-1", 15001, payments.CurrencyRUB, payments.MethodCard, "Order 1")
+	if !errors.Is(err, payments.ErrIdempotencyConflict) {
+		t.Fatalf("err = %v, want %v", err, payments.ErrIdempotencyConflict)
+	}
+}
+
+func TestServiceCreateWithIdempotencyKeyRequiresKey(t *testing.T) {
+	svc, _, _ := newService()
+
+	_, err := svc.CreateWithIdempotencyKey(context.Background(), "", 15000, payments.CurrencyRUB, payments.MethodCard, "Order 1")
+
+	if !errors.Is(err, payments.ErrInvalidIdempotencyKey) {
+		t.Fatalf("err = %v, want %v", err, payments.ErrInvalidIdempotencyKey)
+	}
+}
+
 func TestServiceCreateRejectedByProvider(t *testing.T) {
 	svc, repo, gateway := newService()
 	gateway.createErr = fmt.Errorf("%w: invalid_request: amount", payments.ErrPaymentRejected)

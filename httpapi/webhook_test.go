@@ -14,12 +14,14 @@ import (
 )
 
 type webhookGateway struct {
-	state      payments.ProviderState
-	fetchErr   error
-	fetchCalls int
+	state       payments.ProviderState
+	fetchErr    error
+	fetchCalls  int
+	createCalls int
 }
 
 func (g *webhookGateway) CreatePayment(context.Context, *payments.Payment) (payments.Checkout, error) {
+	g.createCalls++
 	return payments.Checkout{ProviderID: "provider-payment-1", ConfirmationURL: "https://pay.example/1"}, nil
 }
 

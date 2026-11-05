@@ -29,6 +29,21 @@ type Payment struct {
 	updatedAt       time.Time // когда статус менялся последний раз
 }
 
+// PaymentRecord — данные платежа для сохранения в постоянном хранилище.
+type PaymentRecord struct {
+	ID              uuid.UUID
+	Amount          int64
+	Currency        Currency
+	Method          Method
+	Description     string
+	Status          Status
+	ProviderID      string
+	ConfirmationURL string
+	CancelReason    string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
 // NewPayment проверяет входные данные и создаёт платёж в статусе StatusNew.
 func NewPayment(amount int64, currency Currency, method Method, description string) (*Payment, error) {
 	if amount <= 0 {
@@ -93,6 +108,47 @@ func (p *Payment) CreatedAt() time.Time { return p.createdAt }
 
 // UpdatedAt возвращает время последней смены статуса.
 func (p *Payment) UpdatedAt() time.Time { return p.updatedAt }
+
+// Record возвращает копию данных платежа для репозитория.
+func (p *Payment) Record() PaymentRecord {
+	return PaymentRecord{
+		ID:              p.id,
+		Amount:          p.amount,
+		Currency:        p.currency,
+		Method:          p.method,
+		Description:     p.description,
+		Status:          p.status,
+		ProviderID:      p.providerID,
+		ConfirmationURL: p.confirmationURL,
+		CancelReason:    p.cancelReason,
+		CreatedAt:       p.createdAt,
+		UpdatedAt:       p.updatedAt,
+	}
+}
+
+// RestorePayment восстанавливает платёж из записи постоянного хранилища.
+func RestorePayment(record PaymentRecord) (*Payment, error) {
+	if record.ID == uuid.Nil || record.Amount <= 0 || !record.Currency.IsValid() || !record.Method.IsValid() ||
+		utf8.RuneCountInString(record.Description) > maxDescriptionLen || !record.Status.IsValid() ||
+		record.CreatedAt.IsZero() || record.UpdatedAt.IsZero() ||
+		((record.Status == StatusPending || record.Status == StatusSucceeded) && record.ProviderID == "") {
+		return nil, ErrInvalidRecord
+	}
+
+	return &Payment{
+		id:              record.ID,
+		amount:          record.Amount,
+		currency:        record.Currency,
+		method:          record.Method,
+		description:     record.Description,
+		status:          record.Status,
+		providerID:      record.ProviderID,
+		confirmationURL: record.ConfirmationURL,
+		cancelReason:    record.CancelReason,
+		createdAt:       record.CreatedAt,
+		updatedAt:       record.UpdatedAt,
+	}, nil
+}
 
 // Submit отмечает, что платёж создан у провайдера и ждёт оплаты клиентом.
 func (p *Payment) Submit(providerID, confirmationURL string) error {

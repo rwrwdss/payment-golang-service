@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: payment
+      POSTGRES_PASSWORD: payment
+      POSTGRES_DB: payment
+    ports:
+      - "5432:5432"
+    volumes:
+      - payment-data:/var/lib/postgresql/data
+
+volumes:
+  payment-data:

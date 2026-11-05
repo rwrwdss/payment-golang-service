@@ -63,7 +63,12 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p, err := h.service.Create(r.Context(), input.Amount, input.Currency, input.Method, input.Description)
+	key := r.Header.Get("Idempotency-Key")
+	if key == "" {
+		writeError(w, http.StatusBadRequest, payments.ErrInvalidIdempotencyKey.Error())
+		return
+	}
+	p, err := h.service.CreateWithIdempotencyKey(r.Context(), key, input.Amount, input.Currency, input.Method, input.Description)
 	if err != nil {
 		if p != nil {
 			writeJSON(w, http.StatusBadGateway, paymentResponseFrom(p))
@@ -99,6 +104,10 @@ func writeServiceError(w http.ResponseWriter, err error) {
 		errors.Is(err, payments.ErrInvalidMethod),
 		errors.Is(err, payments.ErrInvalidDescription):
 		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, payments.ErrInvalidIdempotencyKey):
+		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, payments.ErrIdempotencyConflict):
+		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, payments.ErrNotFound):
 		writeError(w, http.StatusNotFound, "payment not found")
 	default:

@@ -59,6 +59,27 @@ func TestPaymentRepositorySaveOverwrites(t *testing.T) {
 	}
 }
 
+func TestPaymentRepositoryCreateWithIdempotency(t *testing.T) {
+	repo := NewPaymentRepository()
+	first := newPayment(t)
+	second := newPayment(t)
+
+	created, err := repo.CreateWithIdempotency(context.Background(), first, "order-1", "hash-1")
+	if err != nil || created.ID() != first.ID() {
+		t.Fatalf("first call = %v/%v", created, err)
+	}
+
+	reused, err := repo.CreateWithIdempotency(context.Background(), second, "order-1", "hash-1")
+	if err != nil || reused.ID() != first.ID() {
+		t.Fatalf("duplicate call = %v/%v, want original payment", reused, err)
+	}
+
+	_, err = repo.CreateWithIdempotency(context.Background(), second, "order-1", "different-hash")
+	if !errors.Is(err, payments.ErrIdempotencyConflict) {
+		t.Fatalf("err = %v, want %v", err, payments.ErrIdempotencyConflict)
+	}
+}
+
 func TestPaymentRepositoryKeepsChangesUntilSave(t *testing.T) {
 	repo := NewPaymentRepository()
 	p := newPayment(t)
