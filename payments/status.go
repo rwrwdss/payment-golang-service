@@ -13,6 +13,16 @@ const (
 	StatusCanceled  Status = "canceled"  // платёж отменён или отклонён
 )
 
+// IsValid сообщает, известен ли сервису этот статус.
+func (s Status) IsValid() bool {
+	switch s {
+	case StatusNew, StatusPending, StatusSucceeded, StatusCanceled:
+		return true
+	default:
+		return false
+	}
+}
+
 // transitions — разрешённые переходы между статусами:
 // ключ — текущий статус, значение — статусы, в которые из него можно перейти.
 // StatusSucceeded и StatusCanceled здесь нет намеренно: это финальные статусы,

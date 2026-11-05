@@ -73,6 +73,49 @@ func TestNewPaymentGeneratesUniqueIDs(t *testing.T) {
 	}
 }
 
+func TestPaymentRecordRoundTrip(t *testing.T) {
+	p, err := NewPayment(15000, CurrencyRUB, MethodCard, "Заказ №1")
+	if err != nil {
+		t.Fatalf("NewPayment: %v", err)
+	}
+	if err := p.Submit("provider-id", "https://yoomoney.ru/checkout"); err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	if err := p.Cancel("insufficient_funds"); err != nil {
+		t.Fatalf("Cancel: %v", err)
+	}
+
+	restored, err := RestorePayment(p.Record())
+	if err != nil {
+		t.Fatalf("RestorePayment: %v", err)
+	}
+	if restored.Record() != p.Record() {
+		t.Errorf("restored record = %+v, want %+v", restored.Record(), p.Record())
+	}
+}
+
+func TestRestoreCanceledPaymentWithoutProviderID(t *testing.T) {
+	p, err := NewPayment(100, CurrencyRUB, MethodCard, "Order 2")
+	if err != nil {
+		t.Fatalf("NewPayment: %v", err)
+	}
+	if err := p.Cancel("provider rejected request"); err != nil {
+		t.Fatalf("Cancel: %v", err)
+	}
+
+	if _, err := RestorePayment(p.Record()); err != nil {
+		t.Fatalf("RestorePayment: %v", err)
+	}
+}
+
+func TestRestorePaymentRejectsInvalidRecord(t *testing.T) {
+	_, err := RestorePayment(PaymentRecord{Status: "unknown"})
+
+	if !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("err = %v, want %v", err, ErrInvalidRecord)
+	}
+}
+
 func TestPaymentSubmit(t *testing.T) {
 	p := newPaymentIn(t, StatusNew)
 
