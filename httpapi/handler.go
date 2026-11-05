@@ -20,6 +20,7 @@ func Handler(service *payments.Service) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /payments", h.create)
 	mux.HandleFunc("GET /payments/{id}", h.get)
+	mux.HandleFunc("POST /webhooks/yookassa", h.yookassaWebhook)
 	return mux
 }
 
